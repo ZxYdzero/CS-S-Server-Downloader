@@ -1,0 +1,17 @@
+
+[profile.release]
+# Add the following two lines:
+lto = true
+codegen-units = 1
+
+
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+  "-C", "target-feature=+crt-static",
+  "-C", "link-arg=-Wl,-Bstatic",
+  "-C", "link-arg=-Wl,-Bdynamic",
+  "-C", "link-arg=-s",
+  "-C", "link-arg=/DEBUG:NONE",
+  "-C", "opt-level=3",
+  "-O",
+]
