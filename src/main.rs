@@ -1,14 +1,16 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_must_use)]
 use std::fs::{self};
 use std::io::{copy, self};
 use std::path::Path;
-
+use std::thread;
+use tokio::time::{Duration};
 use iced::executor;
 use iced::widget::{button, column, container, progress_bar, text, Column};
 use iced::{
     Alignment, Application, Command, Element, Length, Settings, Subscription,
     Theme,
 };
+
 use winreg::RegKey;
 use winreg::enums::HKEY_LOCAL_MACHINE;
 
@@ -48,7 +50,7 @@ impl Application for Example {
     }
 
     fn title(&self) -> String {
-        String::from("下载器")
+        String::from("CS:S低手营服务器资源下载器")
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -104,6 +106,7 @@ enum State {
     Downloading { progress: f32 },
     Finished,
     Errored,
+    Unzip,
 }
 
 impl Download {
@@ -122,6 +125,7 @@ impl Download {
                 self.state = State::Downloading { progress: 0.0 };
             }
             State::Downloading { .. } => {}
+            State::Unzip => {}
         }
     }
 
@@ -135,26 +139,40 @@ impl Download {
                     *progress = percentage;
                 }
                 download::Progress::Finished => {
-                    self.state = State::Finished;
                     let mut hecystring = find();
                     hecystring.push_str("\\cstrike\\download");
                     println!("正在解压");
 
-                    extract(Path::new("./tmp/tmp.zip"), Path::new("./tmp"));
-                    println!("解压完成");
-                    println!("正在导入");
-                    let pr = hecystring.clone();
-                    println!("导入位置：{}", &pr);
-                    copy_dir_recursively("./tmp/csgo-server-map-qq_26978213-master-patch-98686/", &pr.clone()).expect("无法导入地图文件");
-        
-                    println!("导入完成");
-                    println!("删除tmp");
-                    let error = remove();
-                    error.unwrap();
-                    println!("删除完成");
+                    self.state = State::Finished;
+
+                    let _afterdw = thread::spawn(move || {
+                        let _haneld = extract(Path::new("./tmp/tmp.zip"), Path::new("./tmp"));
+                        println!("解压完成");
+                        println!("正在导入");
+                        let pr = hecystring.clone();
+                        println!("导入位置：{}", &pr);
+                        copy_dir_recursively("./tmp/csgo-server-map-qq_26978213-master-patch-98686/", &pr.clone()).expect("无法导入地图文件");
+    
+                        println!("导入完成");
+                        println!("删除tmp");
+                        let error = remove();
+                        error.unwrap();
+                        println!("删除完成");
+
+                        State::Unzip
+                    });
+
+                    sleep();
+                    let _get = _afterdw.join().unwrap();
+                    self.state = _get;
+
+
                 }
                 download::Progress::Errored => {
                     self.state = State::Errored;
+                }
+                download::Progress::Unzip => {
+                    self.state = State::Unzip;
                 }
             }
         }
@@ -176,6 +194,7 @@ impl Download {
             State::Downloading { progress } => *progress,
             State::Finished { .. } => 100.0,
             State::Errored { .. } => 0.0,
+            State::Unzip { .. } => 100.0,
         };
 
         let progress_bar = progress_bar(0.0..=100.0, current_progress);
@@ -200,6 +219,12 @@ impl Download {
             .spacing(10)
             .align_items(Alignment::Center)
             .into(),
+            State::Unzip => {
+                column!["Download Success!"]
+                .spacing(20)
+                .align_items(Alignment::Center)
+                .into()
+            }
         };
 
         Column::new()
@@ -221,7 +246,7 @@ fn find() -> String {
     path
 }
 
-fn extract(test: &Path, target: &Path) {
+fn extract(test: &Path, target: &Path) -> download::Progress {
     let zipfile = std::fs::File::open(&test).unwrap();
     let mut zip = zip::ZipArchive::new(zipfile).unwrap();
 
@@ -232,7 +257,7 @@ fn extract(test: &Path, target: &Path) {
     }
     for i in 0..zip.len() {
         let mut file = zip.by_index(i).unwrap();
-        println!("Filename: {} {:?}", file.name(), file.sanitized_name());
+        println!("Filename: {}", file.name());
 
         if file.is_dir() {
             println!("file utf8 path {:?}", file.name_raw());
@@ -250,6 +275,7 @@ fn extract(test: &Path, target: &Path) {
 
         }
     }
+    download::Progress::Unzip
 }
 
 fn copy_dir_recursively(src: &str, dst: &str) -> io::Result<()> {
@@ -282,5 +308,10 @@ fn copy_dir_recursively(src: &str, dst: &str) -> io::Result<()> {
 
 fn remove() -> io::Result<()>{
     fs::remove_dir_all("./tmp")?;
+    
     Ok(())
+}
+
+async fn sleep() {
+    tokio::time::sleep(Duration::from_millis(3000)).await;
 }

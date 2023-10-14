@@ -15,11 +15,11 @@ pub fn file<I: 'static + Hash + Copy + Send + Sync, T: ToString>(
 pub struct Download<I> {
     id: I,
     url: String,
-    
+
 }
 
 async fn download<I: Copy>(id: I, state: State) -> ((I, Progress), State) {
-    
+
     match state {
         State::Ready(url) => {
 
@@ -88,6 +88,8 @@ pub enum Progress {
     Advanced(f32),
     Finished,
     Errored,
+    Unzip,
+
 }
 
 pub enum State {
@@ -99,4 +101,5 @@ pub enum State {
         downloaded: u64,
     },
     Finished,
+    
 }
